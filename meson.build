@@ -827,6 +827,7 @@ _noctalia_sources = files(
   'src/compositors/dwl/dwl_workspace_backend.cpp',
   'src/compositors/ext_workspace/ext_workspace_output_backend.cpp',
   'src/compositors/ext_workspace/ext_workspace_backend.cpp',
+  'src/compositors/generic/generic_toplevel_occupancy_backend.cpp',
   'src/compositors/hyprland/hyprland_runtime.cpp',
   'src/compositors/hyprland/hyprland_event_handler.cpp',
   'src/compositors/hyprland/hyprland_output_backend.cpp',

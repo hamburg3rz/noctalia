@@ -3,6 +3,7 @@
 #include "compositors/compositor_detect.h"
 #include "compositors/compositor_runtime.h"
 #include "compositors/ext_workspace/ext_workspace_output_backend.h"
+#include "compositors/generic/generic_toplevel_occupancy_backend.h"
 #include "compositors/hyprland/hyprland_keyboard_backend.h"
 #include "compositors/hyprland/hyprland_output_backend.h"
 #include "compositors/hyprland/hyprland_runtime.h"
@@ -330,7 +331,7 @@ namespace {
   }
 
   [[nodiscard]] std::unique_ptr<compositors::WorkspaceMetadataBackend>
-  createWorkspaceMetadataBackend(compositors::CompositorRuntimeRegistry& runtimeRegistry) {
+  createWorkspaceMetadataBackend(compositors::CompositorRuntimeRegistry& runtimeRegistry, const WaylandConnection& wayland) {
     switch (compositors::detect()) {
     case compositors::CompositorKind::Triad:
       return std::make_unique<TriadWorkspaceBackend>(runtimeRegistry.triad());
@@ -345,7 +346,18 @@ namespace {
     case compositors::CompositorKind::Unknown:
       break;
     }
-    return nullptr;
+    // No dedicated integration for this compositor (e.g. Jay). Always
+    // install the generic fallback here - it is NOT gated on
+    // wayland.hasForeignToplevelManager() at this point, because this
+    // factory runs from CompositorPlatform's constructor, which happens
+    // before WaylandConnection::connect() (see
+    // Application::initializeServices() in application_services.cpp), so
+    // the registry hasn't been populated yet and that check would always
+    // read false here regardless of what the compositor actually supports.
+    // The backend itself checks hasForeignToplevelManager() lazily on every
+    // apply() call instead, by which point the connection is guaranteed to
+    // be live.
+    return std::make_unique<compositors::generic::GenericToplevelOccupancyBackend>(wayland);
   }
 
   [[nodiscard]] std::unique_ptr<KeyboardLayoutBackend>
@@ -522,7 +534,7 @@ namespace {
 CompositorPlatform::CompositorPlatform(WaylandConnection& wayland)
     : m_wayland(wayland), m_runtimeRegistry(std::make_unique<compositors::CompositorRuntimeRegistry>()),
       m_workspaces(std::make_unique<WaylandWorkspaces>(*m_runtimeRegistry)) {
-  m_workspaceMetadataBackend = createWorkspaceMetadataBackend(*m_runtimeRegistry);
+  m_workspaceMetadataBackend = createWorkspaceMetadataBackend(*m_runtimeRegistry, m_wayland);
   if (auto focusedOutputBackend = createFocusedOutputBackend(*m_runtimeRegistry); focusedOutputBackend != nullptr) {
     m_focusedOutputBackends.push_back(std::move(focusedOutputBackend));
   }
