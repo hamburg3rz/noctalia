@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <print>
 #include <string>
 #include <string_view>
@@ -54,13 +55,29 @@ int main() {
   }
 
   bool ok = true;
-  ok = expect(!scripting::supportsPluginApiVersion(2), "plugin API 2 should be too old") && ok;
-  ok = expect(scripting::supportsPluginApiVersion(3), "plugin API 3 should be supported") && ok;
-  ok = expect(scripting::supportsPluginApiVersion(4), "plugin API 4 should be supported") && ok;
-  ok = expect(scripting::supportsPluginApiVersion(5), "plugin API 5 should be supported") && ok;
-  ok = expect(scripting::supportsPluginApiVersion(6), "plugin API 6 should be supported") && ok;
-  ok = expect(scripting::supportsPluginApiVersion(7), "plugin API 7 should be supported") && ok;
-  ok = expect(!scripting::supportsPluginApiVersion(8), "plugin API 8 should be too new") && ok;
+  static_assert(scripting::kOldestSupportedPluginApiVersion > 0);
+  ok = expect(
+           !scripting::supportsPluginApiVersion(scripting::kOldestSupportedPluginApiVersion - 1),
+           "plugin API before oldest should be too old"
+       )
+      && ok;
+  ok = expect(
+           scripting::supportsPluginApiVersion(scripting::kOldestSupportedPluginApiVersion),
+           "oldest plugin API should be supported"
+       )
+      && ok;
+  ok = expect(
+           scripting::supportsPluginApiVersion(scripting::kCurrentPluginApiVersion),
+           "current plugin API should be supported"
+       )
+      && ok;
+  if constexpr (scripting::kCurrentPluginApiVersion < std::numeric_limits<std::uint32_t>::max()) {
+    ok = expect(
+             !scripting::supportsPluginApiVersion(scripting::kCurrentPluginApiVersion + 1),
+             "plugin API after current should be too new"
+         )
+        && ok;
+  }
   const auto defaultManifestPath = root / "defaults/plugin.toml";
   ok = writeText(defaultManifestPath, "id = \"me/defaults\"\nname = \"Defaults\"\nplugin_api = 3\n") && ok;
 
@@ -542,6 +559,49 @@ int main() {
   const auto zeroPluginApi = scripting::parsePluginManifest(zeroPluginApiPath, &error);
   ok = expect(!zeroPluginApi.has_value(), "zero plugin_api should fail") && ok;
   ok = expectEq(error, "invalid 'plugin_api' (expected a positive integer)", "zero plugin API error") && ok;
+
+  const auto oldApiDismissPath = root / "old-api-dismiss/plugin.toml";
+  ok = writeText(
+           oldApiDismissPath,
+           "id = \"me/old-api-dismiss\"\n"
+           "name = \"Old API Dismiss\"\n"
+           "plugin_api = 7\n"
+           "[[panel]]\n"
+           "id = \"panel\"\n"
+           "entry = \"panel.luau\"\n"
+           "dismiss_on_outside_click = false\n"
+       )
+      && ok;
+  error.clear();
+  const auto oldApiDismiss = scripting::parsePluginManifest(oldApiDismissPath, &error);
+  ok = expect(!oldApiDismiss.has_value(), "dismiss_on_outside_click should require plugin API 8") && ok;
+  ok = expectEq(
+           error,
+           "panel entry 'panel': dismiss_on_outside_click requires plugin_api >= 8",
+           "dismiss outside-click API gate error"
+       )
+      && ok;
+
+  const auto dismissPanelPath = root / "dismiss-panel/plugin.toml";
+  ok = writeText(
+           dismissPanelPath,
+           "id = \"me/dismiss-panel\"\n"
+           "name = \"Dismiss Panel\"\n"
+           "plugin_api = 8\n"
+           "[[panel]]\n"
+           "id = \"panel\"\n"
+           "entry = \"panel.luau\"\n"
+           "dismiss_on_outside_click = false\n"
+       )
+      && ok;
+  error.clear();
+  const auto dismissPanel = scripting::parsePluginManifest(dismissPanelPath, &error);
+  ok = expect(dismissPanel.has_value(), error.empty() ? "failed to parse dismiss panel manifest" : error.c_str())
+      && ok;
+  if (dismissPanel.has_value() && expect(dismissPanel->entries.size() == 1, "one dismiss panel entry expected")) {
+    ok = expect(!dismissPanel->entries.front().panelDismissOnOutsideClick, "dismiss_on_outside_click false should parse")
+        && ok;
+  }
 
   std::error_code ec;
   std::filesystem::remove_all(root, ec);

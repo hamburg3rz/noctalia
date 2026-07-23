@@ -342,7 +342,10 @@ std::unique_ptr<Widget> WidgetFactory::create(
   if (type == "network") {
     const bool showLabel = wc != nullptr ? wc->getBool("show_label", true) : true;
     const bool showVpnLabel = wc != nullptr ? wc->getBool("show_vpn_label", false) : false;
-    auto widget = std::make_unique<NetworkWidget>(m_network, m_externalIp, m_sysmon, output, showLabel, showVpnLabel);
+    const std::string vpnStatusMode = wc != nullptr ? wc->getString("vpn_status", "replace") : std::string("replace");
+    auto widget = std::make_unique<NetworkWidget>(
+        m_network, m_externalIp, m_sysmon, output, showLabel, showVpnLabel, vpnStatusMode
+    );
     widget->setContentScale(contentScale);
     return widget;
   }
@@ -502,8 +505,14 @@ std::unique_ptr<Widget> WidgetFactory::create(
       stat = SysmonStat::RamPct;
     } else if (statStr == "swap_pct") {
       stat = SysmonStat::SwapPct;
-    } else if (statStr == "disk_pct") {
-      stat = SysmonStat::DiskPct;
+    } else if (statStr == "disk_used_pct") {
+      stat = SysmonStat::DiskUsedPct;
+    } else if (statStr == "disk_used") {
+      stat = SysmonStat::DiskUsed;
+    } else if (statStr == "disk_free_pct") {
+      stat = SysmonStat::DiskFreePct;
+    } else if (statStr == "disk_free") {
+      stat = SysmonStat::DiskFree;
     } else if (statStr == "net_rx") {
       stat = SysmonStat::NetRx;
     } else if (statStr == "net_tx") {
@@ -520,6 +529,9 @@ std::unique_ptr<Widget> WidgetFactory::create(
       displayMode = SysmonDisplayMode::Graph;
     else if (display == "none")
       displayMode = SysmonDisplayMode::None;
+    const std::string glyphPositionStr = wc != nullptr ? wc->getString("glyph_position", "before") : "before";
+    SysmonGlyphPosition glyphPosition =
+        glyphPositionStr == "after" ? SysmonGlyphPosition::After : SysmonGlyphPosition::Before;
     if (verticalBar && displayMode == SysmonDisplayMode::Graph) {
       displayMode = SysmonDisplayMode::Gauge;
     }
@@ -540,6 +552,8 @@ std::unique_ptr<Widget> WidgetFactory::create(
         .labelMinWidth = static_cast<float>(wc != nullptr ? wc->getDouble("label_min_width", 0.0) : 0.0),
         .glyph = wc != nullptr ? wc->getString("glyph", "") : std::string{},
         .customImage = customImageFor(wc),
+        .showUnits = wc != nullptr ? wc->getBool("label_show_units", true) : true,
+        .glyphPosition = glyphPosition,
     };
     auto widget = std::make_unique<SysmonWidget>(m_sysmon, m_configService, std::move(options));
     widget->setContentScale(contentScale);
@@ -559,6 +573,7 @@ std::unique_ptr<Widget> WidgetFactory::create(
         .onlyActiveWorkspace = wc != nullptr ? wc->getBool("only_active_workspace", false) : false,
         .showWorkspaceLabel = wc != nullptr ? wc->getBool("show_workspace_label", true) : true,
         .workspaceLabelPlacement = WorkspaceLabelPlacement::Corner,
+        .workspaceGroupContent = WorkspaceGroupContent::Icons,
         .hideEmptyWorkspaces = wc != nullptr ? wc->getBool("hide_empty_workspaces", false) : false,
         .workspaceGroupCapsule = wc != nullptr ? wc->getBool("workspace_group_capsule", true) : true,
         .focusedOutputOnly = wc != nullptr ? wc->getBool("focused_output_only", false) : false,
@@ -601,6 +616,12 @@ std::unique_ptr<Widget> WidgetFactory::create(
         options.workspaceLabelPlacement = WorkspaceLabelPlacement::Centered;
       } else if (placement == "inside") {
         options.workspaceLabelPlacement = WorkspaceLabelPlacement::Inside;
+      }
+      const std::string groupContent = wc->getString("workspace_group_content", "icons");
+      if (groupContent == "count") {
+        options.workspaceGroupContent = WorkspaceGroupContent::Count;
+      } else if (groupContent == "dots") {
+        options.workspaceGroupContent = WorkspaceGroupContent::Dots;
       }
     }
     auto widget = std::make_unique<TaskbarWidget>(m_platform, m_configService, output, std::move(options));

@@ -190,7 +190,11 @@ namespace settings {
         if (stat == "gpu_vram" || stat == "ram_used" || stat == "ram_pct") {
           return "memory";
         }
-        if (stat == "swap_pct" || stat == "disk_pct") {
+        if (stat == "swap_pct"
+            || stat == "disk_used_pct"
+            || stat == "disk_used"
+            || stat == "disk_free_pct"
+            || stat == "disk_free") {
           return "storage";
         }
         if (stat == "net_rx") {
@@ -655,11 +659,19 @@ namespace settings {
         {"full", "settings.widgets.options.full"},
     };
     const std::vector<WidgetSettingSelectOption> sysmonStats = {
-        {"cpu_usage", "settings.widgets.options.cpu-usage"},   {"cpu_temp", "settings.widgets.options.cpu-temp"},
-        {"gpu_temp", "settings.widgets.options.gpu-temp"},     {"gpu_usage", "settings.widgets.options.gpu-usage"},
-        {"gpu_vram", "settings.widgets.options.gpu-vram"},     {"ram_used", "settings.widgets.options.ram-used"},
-        {"ram_pct", "settings.widgets.options.ram-percent"},   {"swap_pct", "settings.widgets.options.swap-percent"},
-        {"disk_pct", "settings.widgets.options.disk-percent"}, {"net_rx", "settings.widgets.options.net-rx"},
+        {"cpu_usage", "settings.widgets.options.cpu-usage"},
+        {"cpu_temp", "settings.widgets.options.cpu-temp"},
+        {"gpu_temp", "settings.widgets.options.gpu-temp"},
+        {"gpu_usage", "settings.widgets.options.gpu-usage"},
+        {"gpu_vram", "settings.widgets.options.gpu-vram"},
+        {"ram_used", "settings.widgets.options.ram-used"},
+        {"ram_pct", "settings.widgets.options.ram-percent"},
+        {"swap_pct", "settings.widgets.options.swap-percent"},
+        {"disk_used_pct", "settings.widgets.options.disk-used-percent"},
+        {"disk_used", "settings.widgets.options.disk-used"},
+        {"disk_free_pct", "settings.widgets.options.disk-free-percent"},
+        {"disk_free", "settings.widgets.options.disk-free"},
+        {"net_rx", "settings.widgets.options.net-rx"},
         {"net_tx", "settings.widgets.options.net-tx"},
     };
     const std::vector<WidgetSettingSelectOption> sysmonDisplay = {
@@ -672,6 +684,15 @@ namespace settings {
         {"auto", "settings.widgets.options.auto"},
         {"kb", "settings.widgets.options.kilobytes"},
         {"mb", "settings.widgets.options.megabytes"},
+    };
+    const std::vector<WidgetSettingSelectOption> vpnStatusMode = {
+        {"replace", "settings.widgets.options.replace"},
+        {"both", "settings.widgets.options.both"},
+        {"hidden", "settings.widgets.options.hidden"},
+    };
+    const std::vector<WidgetSettingSelectOption> glyphPositionOptions = {
+        {"before", "settings.widgets.options.before"},
+        {"after", "settings.widgets.options.after"},
     };
     const std::vector<WidgetSettingSelectOption> workspaceDisplay = {
         {"id", "settings.widgets.options.id"},
@@ -687,6 +708,11 @@ namespace settings {
         {"corner", "settings.widgets.options.workspace-label-corner"},
         {"centered", "settings.widgets.options.workspace-label-centered"},
         {"inside", "settings.widgets.options.workspace-label-inside"},
+    };
+    const std::vector<WidgetSettingSelectOption> workspaceGroupContent = {
+        {"icons", "settings.widgets.options.icons"},
+        {"count", "settings.widgets.options.count"},
+        {"dots", "settings.widgets.options.dots"},
     };
     const std::vector<WidgetSettingSelectOption> mediaTitleScroll = {
         {"none", "settings.widgets.options.none"},
@@ -862,10 +888,13 @@ namespace settings {
       add(boolSpec("hide_when_no_media", false));
       add(boolSpec("enable_scroll", true));
     } else if (type == "network") {
+      add(selectSpec("vpn_status", "replace", vpnStatusMode));
       add(boolSpec("show_label", true));
       {
         auto vpnName = boolSpec("show_vpn_label", false);
-        vpnName.visibleWhen = WidgetSettingVisibility{"show_label", {"true"}};
+        WidgetSettingVisibility vis;
+        vis.all = {{"show_label", {"true"}}, {"vpn_status", {"replace", "both"}}};
+        vpnName.visibleWhen = std::move(vis);
         add(std::move(vpnName));
       }
     } else if (type == "notifications") {
@@ -898,7 +927,8 @@ namespace settings {
       add(boolSpec("custom_image_colorize", false));
       {
         auto path = stringSpec("path", "/");
-        path.visibleWhen = WidgetSettingVisibility{"stat", {"disk_pct"}};
+        path.visibleWhen =
+            WidgetSettingVisibility{"stat", {"disk_used_pct", "disk_used", "disk_free_pct", "disk_free"}};
         add(std::move(path));
       }
       {
@@ -932,6 +962,16 @@ namespace settings {
         };
         minWidth.visibleWhen = minWidthSettings;
         add(std::move(minWidth));
+      }
+      {
+        auto showUnits = boolSpec("label_show_units", true);
+        showUnits.visibleWhen = WidgetSettingVisibility{"show_label", {"true"}};
+        add(std::move(showUnits));
+      }
+      {
+        auto glyphPosition = segmentedSpec("glyph_position", "before", glyphPositionOptions);
+        glyphPosition.visibleWhen = WidgetSettingVisibility{"show_label", {"true"}};
+        add(std::move(glyphPosition));
       }
     } else if (type == "power_profile") {
       add(boolSpec("enable_scroll", true));
@@ -999,8 +1039,19 @@ namespace settings {
           add(std::move(hideEmpty));
         }
         {
+          auto groupContent =
+              withGroup(segmentedSpec("workspace_group_content", "icons", workspaceGroupContent), "taskbar.grouping");
+          groupContent.visibleWhen = groupedWorkspaceSettings;
+          add(std::move(groupContent));
+        }
+        {
           auto singleIconPerApp = withGroup(boolSpec("group_single_icon_per_app", false), "taskbar.grouping");
-          singleIconPerApp.visibleWhen = groupedWorkspaceSettings;
+          WidgetSettingVisibility singleIconSettings;
+          singleIconSettings.all = {
+              WidgetSettingVisibilityCondition{"group_by_workspace", {"true"}},
+              WidgetSettingVisibilityCondition{"workspace_group_content", {"icons"}},
+          };
+          singleIconPerApp.visibleWhen = std::move(singleIconSettings);
           add(std::move(singleIconPerApp));
         }
         {
