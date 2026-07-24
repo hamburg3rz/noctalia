@@ -654,6 +654,7 @@ _noctalia_sources = files(
   'src/shell/panel/panel_click_shield.cpp',
   'src/wayland/hyprland/focus_grab_service.cpp',
   'src/shell/panel/panel_manager.cpp',
+  'src/shell/panel/persistent_panel_host.cpp',
   'src/shell/panel/plugin_panel.cpp',
   'src/shell/polkit/polkit_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
@@ -704,6 +705,7 @@ _noctalia_sources = files(
   'src/shell/bar/widget_factory.cpp',
   'src/shell/bar/widgets/active_window_widget.cpp',
   'src/shell/bar/widgets/audio_visualizer_widget.cpp',
+  'src/shell/bar/widgets/audio_visualizer_widget_definition.cpp',
   'src/shell/bar/widgets/battery_widget.cpp',
   'src/shell/bar/widgets/battery_widget_definition.cpp',
   'src/shell/bar/widgets/bluetooth_widget.cpp',
@@ -761,6 +763,7 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/screenshot_widget.cpp',
   'src/system/rfkill_helper.cpp',
   'src/system/screen_time_service.cpp',
+  'src/system/cpu_stat.cpp',
   'src/system/cpu_temp_sensor.cpp',
   'src/system/intel_gpu.cpp',
   'src/system/system_monitor_service.cpp',
@@ -1184,6 +1187,19 @@ audio_glyphs_test = executable('audio_glyphs_test',
 
 test('audio_glyphs', audio_glyphs_test)
 
+math_provider_test = executable('math_provider_test',
+  sources: files(
+    'tests/math_provider_test.cpp',
+    'src/launcher/math_provider.cpp',
+  ),
+  dependencies: [
+    libqalculate_dep,
+  ],
+  include_directories: _noctalia_inc,
+)
+
+test('math_provider', math_provider_test)
+
 hook_manager_test = executable('hook_manager_test',
   sources: files(
     'tests/hook_manager_test.cpp',
@@ -1285,6 +1301,16 @@ cpu_temp_sensor_test = executable('cpu_temp_sensor_test',
 )
 
 test('cpu_temp_sensor', cpu_temp_sensor_test)
+
+cpu_stat_test = executable('cpu_stat_test',
+  sources: files(
+    'tests/cpu_stat_test.cpp',
+    'src/system/cpu_stat.cpp',
+  ),
+  include_directories: _noctalia_inc,
+)
+
+test('cpu_stat', cpu_stat_test)
 
 i18n_language_tag_test = executable('i18n_language_tag_test',
   sources: files(
@@ -1461,11 +1487,13 @@ plugin_manifest_test = executable('plugin_manifest_test',
     'tests/plugin_manifest_test.cpp',
     'src/scripting/plugin_manifest.cpp',
     'src/scripting/plugin_panel_shell.cpp',
+    'src/core/input/key_chord.cpp',
     'src/core/log.cpp',
   ),
   include_directories: _noctalia_inc,
   dependencies: [
     tomlplusplus_dep,
+    xkbcommon_dep,
   ],
 )
 

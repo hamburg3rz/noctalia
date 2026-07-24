@@ -300,6 +300,7 @@
       "unknown-device": "Unknown device"
     },
     "screen-time": {
+      "back": "Back",
       "disabled": "Screen time tracking is off. Enable it in Settings to record per-app usage.",
       "empty": "No app usage recorded yet. Focus a window to start tracking.",
       "hour-0": "12 AM",
@@ -311,7 +312,8 @@
         "14-days": "14 days",
         "3-days": "3 days",
         "today": "Today"
-      }
+      },
+      "view-day": "View day details"
     },
     "shortcuts": {
       "audio": "Audio",
@@ -1903,6 +1905,10 @@
         "launcher-position": {
           "description": "Show a launcher button at the start or end of the dock",
           "label": "Launcher Button"
+        },
+        "layer": {
+          "description": "Use Overlay to show the dock above fullscreen apps",
+          "label": "Wayland Layer"
         },
         "magnification": {
           "description": "Magnify dock icons near the pointer, macOS-style",
@@ -3859,6 +3865,7 @@
       "sort-date-desc": "Sort by date (newest first)",
       "sort-name-asc": "Sort by name (A-Z)",
       "sort-name-desc": "Sort by name (Z-A)",
+      "sort-random": "Sort by random (shuffle)",
       "title": "Wallpaper"
     }
   },

@@ -1,6 +1,7 @@
 #include "shell/bar/widgets/taskbar_widget.h"
 
 #include "compositors/compositor_detect.h"
+#include "compositors/hyprland/hyprland_window_id.h"
 #include "compositors/workspace_backend.h"
 #include "config/config_service.h"
 #include "core/deferred_call.h"
@@ -681,23 +682,6 @@ void TaskbarWidget::buildTaskButtons(Renderer& renderer) {
   const bool showWindowTitle = m_showWindowTitle && windowTitleWidth > minWindowTitleWidth;
   const float tileWidthWithTitle = tileSize + (showWindowTitle ? windowTitleWidth + windowTitleGap : 0.0f);
 
-  const auto workspaceAxisHandler = [this](const InputArea::PointerData& data) -> bool {
-    if (!m_enableScroll || !m_groupByWorkspace) {
-      return false;
-    }
-    if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL && data.axis != WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
-      return false;
-    }
-
-    const float steps = data.scrollSteps();
-    if (steps == 0.0f) {
-      return false;
-    }
-
-    activateAdjacentWorkspace(steps > 0.0f ? 1 : -1);
-    return true;
-  };
-
   auto attachHover = [this](InputArea& area, float width, float height) {
     auto hoverBox = ui::box({
         .radius = resolvedBarCapsuleRadius(width, height),
@@ -761,7 +745,6 @@ void TaskbarWidget::buildTaskButtons(Renderer& renderer) {
     }
     area->setOpacity(tileOpacity);
     area->setAcceptedButtons(InputArea::buttonMask({BTN_LEFT, BTN_RIGHT, BTN_MIDDLE}));
-    area->setOnAxisHandler(workspaceAxisHandler);
 
     const WorkspaceModel* taskWorkspace = nullptr;
     if (m_groupByWorkspace && !task.workspaceKey.empty()) {
@@ -1042,7 +1025,6 @@ void TaskbarWidget::buildTaskButtons(Renderer& renderer) {
       auto wsCopy = ws.workspace;
       wl_output* const wsHost = workspaceHostOutput(ws);
       badge->setOnClick([this, wsCopy, wsHost]() { m_platform.activateWorkspace(wsHost, wsCopy); });
-      badge->inputArea()->setOnAxisHandler(workspaceAxisHandler);
 
       if (hover) {
         attachHover(*badge->inputArea(), disc.width, disc.height);
@@ -1058,7 +1040,6 @@ void TaskbarWidget::buildTaskButtons(Renderer& renderer) {
       auto area = std::make_unique<InputArea>();
       area->setOpacity(summaryOpacity);
       area->setAcceptedButtons(InputArea::buttonMask(BTN_LEFT));
-      area->setOnAxisHandler(workspaceAxisHandler);
       auto wsCopy = ws.workspace;
       wl_output* const wsHost = workspaceHostOutput(ws);
       area->setOnClick([this, wsCopy, wsHost](const InputArea::PointerData& data) {
@@ -1334,7 +1315,6 @@ void TaskbarWidget::buildTaskButtons(Renderer& renderer) {
           auto switcher = std::make_unique<InputArea>();
           switcher->setFrameSize(tileSize, tileSize);
           switcher->setAcceptedButtons(InputArea::buttonMask(BTN_LEFT));
-          switcher->setOnAxisHandler(workspaceAxisHandler);
           auto wsCopy = ws.workspace;
           wl_output* const wsHost = workspaceHostOutput(ws);
           switcher->setOnClick([this, wsCopy, wsHost](const InputArea::PointerData& data) {
@@ -1851,6 +1831,26 @@ void TaskbarWidget::updateModels() {
       };
 
       std::vector<bool> used(workspaceAssignments.size(), false);
+      auto windowIdsMatch = [](std::string_view lhs, std::string_view rhs) {
+        if (lhs.empty() || rhs.empty()) {
+          return false;
+        }
+        if (lhs == rhs) {
+          return true;
+        }
+        return compositors::isHyprland() && compositors::hyprland::windowIdsEqual(lhs, rhs);
+      };
+      auto assignmentIndexForWindowId = [&](std::string_view windowId) -> std::optional<std::size_t> {
+        if (windowId.empty()) {
+          return std::nullopt;
+        }
+        for (std::size_t i = 0; i < workspaceAssignments.size(); ++i) {
+          if (windowIdsMatch(workspaceAssignments[i].windowId, windowId)) {
+            return i;
+          }
+        }
+        return std::nullopt;
+      };
       auto matchesApp = [&](const TaskModel& task, const WorkspaceWindowAssignment& assignment) {
         if (assignment.appId.empty()) {
           return isOrphanAppIdentity(
@@ -1867,8 +1867,58 @@ void TaskbarWidget::updateModels() {
             || assignmentAppLower == task.nameLower;
       };
 
+      // Prefer compositor window ids that actually appear in the assignment list
+      // (Hyprland address mapping). Unrelated identifiers (e.g. ext-toplevel tokens)
+      // must not block later title matching or icons disappear from workspace groups.
+      for (auto& task : nextTasks) {
+        if (task.workspaceWindowId.empty() || !task.workspaceKey.empty()) {
+          continue;
+        }
+        const auto index = assignmentIndexForWindowId(task.workspaceWindowId);
+        if (!index.has_value() || used[*index]) {
+          continue;
+        }
+        const auto& assignment = workspaceAssignments[*index];
+        task.workspaceKey = assignment.workspaceKey;
+        task.workspaceWindowId = assignment.windowId;
+        task.workspaceOrder = *index;
+        used[*index] = true;
+      }
+
+      // Bind focused compositor window id to the active toplevel before title match.
+      if (const auto focusedId = m_platform.focusedCompositorWindowId(); focusedId.has_value()) {
+        if (const auto index = assignmentIndexForWindowId(*focusedId); index.has_value() && !used[*index]) {
+          TaskModel* activeTask = nullptr;
+          for (auto& task : nextTasks) {
+            if (task.active) {
+              activeTask = &task;
+              break;
+            }
+          }
+          if (activeTask != nullptr && matchesApp(*activeTask, workspaceAssignments[*index])) {
+            const auto& assignment = workspaceAssignments[*index];
+            activeTask->workspaceKey = assignment.workspaceKey;
+            activeTask->workspaceWindowId = assignment.windowId;
+            activeTask->workspaceOrder = *index;
+            used[*index] = true;
+          }
+        }
+      }
+
       auto assignMatch = [&](TaskModel& task, bool requireTitle,
                              const std::function<bool(const WorkspaceWindowAssignment&)>& extraPredicate) -> bool {
+        if (const auto existing = assignmentIndexForWindowId(task.workspaceWindowId); existing.has_value()) {
+          if (!used[*existing] && extraPredicate(workspaceAssignments[*existing])) {
+            const auto& assignment = workspaceAssignments[*existing];
+            task.workspaceKey = assignment.workspaceKey;
+            task.workspaceWindowId = assignment.windowId;
+            task.workspaceOrder = *existing;
+            used[*existing] = true;
+            return true;
+          }
+          // This id is a real compositor window — do not rebind via title to another one.
+          return false;
+        }
         for (std::size_t i = 0; i < workspaceAssignments.size(); ++i) {
           if (used[i]) {
             continue;
@@ -1902,6 +1952,9 @@ void TaskbarWidget::updateModels() {
       };
 
       for (auto& task : nextTasks) {
+        if (!task.workspaceKey.empty()) {
+          continue;
+        }
         const auto previous = previousWorkspaceWindowByHandle.find(task.handleKey);
         if (previous == previousWorkspaceWindowByHandle.end()) {
           continue;
@@ -1911,7 +1964,7 @@ void TaskbarWidget::updateModels() {
             continue;
           }
           const auto& assignment = workspaceAssignments[i];
-          if (assignment.windowId != previous->second || !matchesApp(task, assignment)) {
+          if (!windowIdsMatch(assignment.windowId, previous->second) || !matchesApp(task, assignment)) {
             continue;
           }
           task.workspaceKey = assignment.workspaceKey;
@@ -1957,6 +2010,10 @@ void TaskbarWidget::updateModels() {
 
       for (auto& task : nextTasks) {
         if (!task.workspaceKey.empty()) {
+          continue;
+        }
+        // Real compositor window id already present in assignments — leave it alone.
+        if (assignmentIndexForWindowId(task.workspaceWindowId).has_value()) {
           continue;
         }
 
@@ -2023,6 +2080,22 @@ void TaskbarWidget::updateModels() {
           task.workspaceWindowId = assignment.windowId;
           used[i] = true;
           break;
+        }
+      }
+
+      // Active indicator follows the focused compositor window id when bound.
+      if (const auto focusedId = m_platform.focusedCompositorWindowId(); focusedId.has_value()) {
+        TaskModel* focusedTask = nullptr;
+        for (auto& task : nextTasks) {
+          if (!task.workspaceWindowId.empty() && windowIdsMatch(task.workspaceWindowId, *focusedId)) {
+            focusedTask = &task;
+            break;
+          }
+        }
+        if (focusedTask != nullptr) {
+          for (auto& task : nextTasks) {
+            task.active = (&task == focusedTask);
+          }
         }
       }
 

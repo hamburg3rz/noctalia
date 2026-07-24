@@ -873,6 +873,14 @@ namespace settings {
         ToggleSetting{cfg.dock.reserveSpace}, "exclusive zone"
     ));
     entries.push_back(makeEntry(
+        SettingsSection::Dock, "behavior", tr("settings.schema.dock.layer.label"),
+        tr("settings.schema.dock.layer.description"), {"dock", "layer"},
+        asSegmented(plainSelect(
+            {{"top", "settings.options.layer.top"}, {"overlay", "settings.options.layer.overlay"}}, cfg.dock.layer
+        )),
+        "layer shell z-order"
+    ));
+    entries.push_back(makeEntry(
         SettingsSection::Dock, "behavior", tr("settings.schema.dock.show-running.label"),
         tr("settings.schema.dock.show-running.description"), {"dock", "show_running"},
         ToggleSetting{cfg.dock.showRunning}, "windows"
@@ -1224,7 +1232,7 @@ namespace settings {
           SettingsSection::Launcher, "providers", tr("settings.schema.panels.launcher-prefix-calculator.label"),
           tr("settings.schema.panels.launcher-prefix-calculator.description"),
           {"shell", "launcher", "providers", "calculator", "prefix"},
-          TextSetting{.value = storedPrefix("calculator"), .placeholder = ""}, "launcher calculator prefix trigger"
+          TextSetting{.value = storedPrefix("calculator"), .placeholder = "calc"}, "launcher calculator prefix trigger"
       ));
       entries.push_back(makeEntry(
           SettingsSection::Launcher, "providers", tr("settings.schema.panels.launcher-global-calculator.label"),
