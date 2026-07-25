@@ -477,6 +477,9 @@ namespace noctalia::config::schema {
     const Schema<ControlCenterConfig::CalendarTabConfig>& calendarTabSchema() {
       static const Schema<ControlCenterConfig::CalendarTabConfig> s = {
           field(&ControlCenterConfig::CalendarTabConfig::showEventsCard, "show_events_card"),
+          field(&ControlCenterConfig::CalendarTabConfig::showWeekNumbers, "show_week_numbers"),
+          field(&ControlCenterConfig::CalendarTabConfig::eventDateFormat, "event_date_format"),
+          field(&ControlCenterConfig::CalendarTabConfig::eventTimeFormat, "event_time_format"),
       };
       return s;
     }
@@ -1455,7 +1458,6 @@ namespace noctalia::config::schema {
         field(&ShellConfig::polkitAgent, "polkit_agent"),
         enumField(&ShellConfig::passwordMaskStyle, "password_style", kPasswordMaskStyles),
         field(&ShellConfig::settingsShowAdvanced, "settings_show_advanced"),
-        field(&ShellConfig::middleClickOpensWidgetSettings, "middle_click_opens_widget_settings"),
         field(&ShellConfig::showLocation, "show_location"),
         field(&ShellConfig::appIconColorize, "app_icon_colorize"),
         colorSpecField(&ShellConfig::appIconColor, "app_icon_color", /*alwaysEmit=*/false),
@@ -1562,8 +1564,6 @@ namespace noctalia::config::schema {
     static const Schema<CalendarConfig> s = {
         field(&CalendarConfig::enabled, "enabled"),
         field(&CalendarConfig::refreshMinutes, "refresh_minutes", kRefreshMinutesRange),
-        field(&CalendarConfig::eventDateFormat, "event_date_format"),
-        field(&CalendarConfig::eventTimeFormat, "event_time_format"),
         namedMap<CalendarConfig, CalendarConfig::Account>(
             &CalendarConfig::accounts, "account", calendarAccountSchema(),
             [](CalendarConfig::Account& a, std::string_view id) { a.id = std::string(id); },
@@ -2091,22 +2091,14 @@ namespace noctalia::config::schema {
 
   const Schema<BarDeadZoneConfig>& barDeadZoneSchema() {
     static const Schema<BarDeadZoneConfig> s = {
-        field(&BarDeadZoneConfig::command, "command"),
-        field(&BarDeadZoneConfig::rightCommand, "right_command"),
-        field(&BarDeadZoneConfig::middleCommand, "middle_command"),
-        field(&BarDeadZoneConfig::scrollUpCommand, "scroll_up_command"),
-        field(&BarDeadZoneConfig::scrollDownCommand, "scroll_down_command"),
+        field(&BarDeadZoneConfig::actions, "actions"),
     };
     return s;
   }
 
   const Schema<BarDeadZoneOverride>& barDeadZoneOverrideSchema() {
     static const Schema<BarDeadZoneOverride> s = {
-        optionalTrimmedStringField(&BarDeadZoneOverride::command, "command"),
-        optionalTrimmedStringField(&BarDeadZoneOverride::rightCommand, "right_command"),
-        optionalTrimmedStringField(&BarDeadZoneOverride::middleCommand, "middle_command"),
-        optionalTrimmedStringField(&BarDeadZoneOverride::scrollUpCommand, "scroll_up_command"),
-        optionalTrimmedStringField(&BarDeadZoneOverride::scrollDownCommand, "scroll_down_command"),
+        field(&BarDeadZoneOverride::actions, "actions"),
     };
     return s;
   }
@@ -2159,6 +2151,7 @@ namespace noctalia::config::schema {
         capsuleBorderField(&BarConfig::widgetCapsuleBorder, &BarConfig::widgetCapsuleBorderSpecified, "capsule_border"),
         field(&BarConfig::hoverHighlight, "hover_highlight"),
         subTable(&BarConfig::deadZone, "dead_zone", barDeadZoneSchema()),
+        field(&BarConfig::actions, "actions"),
     };
     return s;
   }
