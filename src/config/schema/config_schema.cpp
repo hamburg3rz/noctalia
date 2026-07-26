@@ -1433,6 +1433,7 @@ namespace noctalia::config::schema {
         field(&ShellConfig::inputBorders, "input_borders"),
         field(&ShellConfig::popupBorders, "popup_borders"),
         field(&ShellConfig::popupShadows, "popup_shadows"),
+        field(&ShellConfig::cardBorders, "card_borders"),
         // font_family is trimmed; empty falls back to sans-serif.
         custom<ShellConfig>(
             "font_family",
@@ -1464,6 +1465,7 @@ namespace noctalia::config::schema {
         field(&ShellConfig::launchAppsAsSystemdServices, "launch_apps_as_systemd_services"),
         field(&ShellConfig::launchAppsCustomCommand, "launch_apps_custom_command"),
         field(&ShellConfig::clipboardEnabled, "clipboard_enabled"),
+        field(&ShellConfig::clipboardKeepFromClosedApps, "clipboard_keep_from_closed_apps"),
         field(
             &ShellConfig::clipboardHistoryMaxEntries, "clipboard_history_max_entries", kClipboardHistoryMaxEntriesRange
         ),

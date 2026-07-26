@@ -733,6 +733,7 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/launcher_widget.cpp',
   'src/shell/bar/widgets/launcher_widget_definition.cpp',
   'src/shell/bar/widgets/media_widget.cpp',
+  'src/shell/bar/widgets/media_widget_definition.cpp',
   'src/shell/bar/widgets/network_widget.cpp',
   'src/shell/bar/widgets/network_widget_definition.cpp',
   'src/shell/bar/widgets/notification_widget.cpp',
@@ -755,6 +756,7 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/test_widget.cpp',
   'src/shell/bar/widgets/theme_mode_widget.cpp',
   'src/shell/bar/widgets/tray_widget.cpp',
+  'src/shell/bar/widgets/tray_widget_definition.cpp',
   'src/shell/bar/widgets/volume_widget.cpp',
   'src/shell/bar/widgets/brightness_widget.cpp',
   'src/shell/bar/widgets/brightness_widget_definition.cpp',
@@ -1674,6 +1676,28 @@ config_widget_test = executable('config_widget_test',
 
 test('config_widget', config_widget_test)
 
+capsule_group_reconcile_test = executable('capsule_group_reconcile_test',
+  sources: files(
+    'tests/capsule_group_reconcile_test.cpp',
+    'src/config/widget_config.cpp',
+    'src/config/config_types.cpp',
+    'src/render/core/color.cpp',
+    'src/ui/palette.cpp',
+    'src/theme/builtin_palettes.cpp',
+    'src/theme/fixed_palette.cpp',
+    'src/theme/color.cpp',
+    'src/theme/contrast.cpp',
+    'src/core/input/key_chord.cpp',
+  ),
+  include_directories: _noctalia_inc,
+  dependencies: [
+    xkbcommon_dep,
+    tomlplusplus_dep,
+  ],
+)
+
+test('capsule_group_reconcile', capsule_group_reconcile_test)
+
 widget_definition_test = executable('widget_definition_test',
   sources: files(
     'tests/widget_definition_test.cpp',
@@ -1688,6 +1712,7 @@ widget_definition_test = executable('widget_definition_test',
     'src/shell/bar/widgets/custom_button_widget_definition.cpp',
     'src/shell/bar/widgets/launcher_widget_definition.cpp',
     'src/shell/bar/widgets/lock_keys_widget_definition.cpp',
+    'src/shell/bar/widgets/media_widget_definition.cpp',
     'src/shell/bar/widgets/network_widget_definition.cpp',
     'src/shell/bar/widgets/notification_widget_definition.cpp',
       'src/shell/bar/widgets/privacy_widget_definition.cpp',
@@ -1696,6 +1721,7 @@ widget_definition_test = executable('widget_definition_test',
     'src/shell/bar/widgets/settings_widget_definition.cpp',
     'src/shell/bar/widgets/spacer_widget_definition.cpp',
     'src/shell/bar/widgets/text_widget_definition.cpp',
+    'src/shell/bar/widgets/tray_widget_definition.cpp',
     'src/shell/bar/widgets/wallpaper_widget_definition.cpp',
     'src/shell/bar/widgets/weather_widget_definition.cpp',
     'src/config/widget_config.cpp',
@@ -1712,6 +1738,8 @@ widget_definition_test = executable('widget_definition_test',
   dependencies: [
     xkbcommon_dep,
     tomlplusplus_dep,
+    # tray_widget.h reaches tray_service.h, which includes <sdbus-c++/sdbus-c++.h>.
+    sdbus_cpp_dep,
   ],
 )
 
@@ -1855,6 +1883,28 @@ clipboard_storage_permissions_test = executable('clipboard_storage_permissions_t
 )
 
 test('clipboard_storage_permissions', clipboard_storage_permissions_test)
+
+clipboard_service_test = executable('clipboard_service_test',
+  sources: files(
+    'tests/clipboard_service_test.cpp',
+    'src/config/atomic_file.cpp',
+    'src/core/log.cpp',
+    'src/security/encrypted_file_store.cpp',
+    'src/security/secret_store.cpp',
+    'src/security/secure_buffer.cpp',
+    'src/security/storage_key_provider.cpp',
+    'src/wayland/clipboard_service.cpp',
+  ) + _protocol_headers + _protocol_sources,
+  include_directories: _noctalia_inc,
+  dependencies: [
+    libsecret_dep,
+    libsodium_dep,
+    nlohmann_dep,
+    wayland_client_dep,
+  ],
+)
+
+test('clipboard_service', clipboard_service_test)
 
 image_source_log_test = executable('image_source_log_test',
   sources: files(

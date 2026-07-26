@@ -516,9 +516,11 @@
         "show-keyboard-layout": "Keyboard Layout",
         "show-label": "Show Label",
         "show-login-button": "Login Button",
+        "show-media": "Media",
         "show-password-hint": "Password Hint",
         "show-session-buttons": "Session Buttons",
         "show-vpn-label": "Show VPN Label",
+        "show-weather": "Weather",
         "show-when-idle": "Show When Idle",
         "stat": "Stat",
         "stat-cpu-temp": "CPU Temp",
@@ -1476,8 +1478,13 @@
         "open-source": "Open plugin source repository",
         "results-count": "{count} plugins",
         "search-placeholder": "Search plugins…",
-        "source-all": "All",
-        "sources": "Sources",
+        "sort-added-at-asc": "Sort by date added (oldest first)",
+        "sort-added-at-desc": "Sort by date added (newest first)",
+        "sort-name-asc": "Sort by name (A-Z)",
+        "sort-name-desc": "Sort by name (Z-A)",
+        "sort-updated-at-asc": "Sort by date updated (oldest first)",
+        "sort-updated-at-desc": "Sort by date updated (newest first)",
+        "source-all": "All sources",
         "title": "Plugin Store"
       }
     },
@@ -1512,6 +1519,10 @@
         "button-borders": {
           "description": "Draw outlines around buttons throughout the shell",
           "label": "Button Borders"
+        },
+        "card-borders": {
+          "description": "Draw outlines around section cards inside panels and the settings window",
+          "label": "Card Borders"
         },
         "community-palette": {
           "description": "Choose a palette from the community catalog",
@@ -2173,7 +2184,7 @@
       },
       "panels": {
         "borders": {
-          "description": "Draw an outline on panels and section cards inside panels",
+          "description": "Draw an outline on floating panels",
           "label": "Borders"
         },
         "control-center-sidebar": {
@@ -2666,6 +2677,10 @@
           "description": "Command to run from image clipboard entries; use {path} for the file path, {stdin} to mark the stdin position, or omit {path} to pipe automatically",
           "label": "Image Action Command",
           "placeholder": "gimp {path} or satty -f -"
+        },
+        "clipboard-keep-from-closed-apps": {
+          "description": "Keep the last copied item available to paste after the application you copied it from closes",
+          "label": "Keep Clipboard From Closed Apps"
         },
         "clipboard-storage": {
           "button": "Retry",

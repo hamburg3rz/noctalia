@@ -168,7 +168,7 @@ void Application::initUiRenderSurfacesAndSettings() {
     m_lockscreenWidgetsController.toggleEdit();
     if (!wasEditing && m_lockscreenWidgetsController.isEditing()) {
       if (m_settingsWindow.isOpen()) {
-        m_settingsWindow.close();
+        DeferredCall::callLater([this]() { m_settingsWindow.close(); });
       }
       notify::info(
           "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
@@ -394,6 +394,11 @@ void Application::initInputDispatch() {
     if (m_fileDialogPopup.onPointerEvent(event)) {
       return;
     }
+    // Region overlay is layer Overlay + exclusive keyboard; prefer it over the
+    // widgets editors (Bottom / OnDemand) so confirm/cancel still work mid-edit.
+    if (m_screenshotService.onPointerEvent(event)) {
+      return;
+    }
     if (m_lockscreenWidgetsController.onPointerEvent(event)) {
       return;
     }
@@ -401,9 +406,6 @@ void Application::initInputDispatch() {
       return;
     }
     if (m_wallpaper.onPointerEvent(event)) {
-      return;
-    }
-    if (m_screenshotService.onPointerEvent(event)) {
       return;
     }
     if (m_trayMenu.onPointerEvent(event)) {
@@ -452,6 +454,9 @@ void Application::initInputDispatch() {
       m_fileDialogPopup.onKeyboardEvent(event);
       return;
     }
+    if (m_screenshotService.onKeyboardEvent(event)) {
+      return;
+    }
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.onKeyboardEvent(event);
       return;
@@ -462,9 +467,6 @@ void Application::initInputDispatch() {
     }
     if (m_settingsWindow.ownsKeyboardSurface(m_wayland.lastKeyboardSurface())) {
       m_settingsWindow.onKeyboardEvent(event);
-      return;
-    }
-    if (m_screenshotService.onKeyboardEvent(event)) {
       return;
     }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {
@@ -676,14 +678,7 @@ void Application::initPanelManagerAndPanels() {
           &m_wayland, &m_configService, &m_thumbnailService, &m_wallpaperScanner, &m_themeService
       )
   );
-  std::size_t trayDrawerColumns = 3;
-  if (const auto it = m_configService.config().widgets.find("tray"); it != m_configService.config().widgets.end()) {
-    trayDrawerColumns =
-        static_cast<std::size_t>(std::clamp<std::int64_t>(it->second.getInt("drawer_columns", 3), 1, 5));
-  }
-  m_panelManager.registerPanel(
-      "tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService, trayDrawerColumns)
-  );
+  m_panelManager.registerPanel("tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService));
   m_panelManager.registerPanel("polkit", std::make_unique<PolkitPanel>(&m_configService, [this]() {
                                  return m_polkitAgent.get();
                                }));
@@ -962,7 +957,7 @@ void Application::initWidgetControllersAndCallbacks() {
   });
   m_desktopWidgetsController.setOnEnterEditCallback([this]() {
     if (m_settingsWindow.isOpen()) {
-      m_settingsWindow.close();
+      DeferredCall::callLater([this]() { m_settingsWindow.close(); });
     }
   });
   m_iconThemePollSource.setChangeCallback([this]() { onIconThemeChanged(); });

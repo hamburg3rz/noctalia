@@ -118,6 +118,30 @@ namespace lockscreen_login_box {
     return resolveLayout(readString(settings, kLayoutKey, kLayoutRegular));
   }
 
+  InfoExtrasVisibility
+  resolveInfoExtrasVisibility(bool regular, const LoginBoxStyle& style, bool mediaReady, bool weatherReady) {
+    if (!regular) {
+      return {};
+    }
+    const bool mediaConfigured = style.showMedia;
+    const bool weatherConfigured = style.showWeather;
+    // Hide an unavailable side only when the other can fill the row; otherwise keep a
+    // placeholder so Regular never collapses to an empty info strip.
+    const bool showWeather = weatherConfigured && (weatherReady || !mediaConfigured);
+    const bool showMedia = mediaConfigured && (mediaReady || !showWeather);
+    return InfoExtrasVisibility{.showMedia = showMedia, .showWeather = showWeather};
+  }
+
+  float infoExtraBudget(float contentWidth, bool showSelf, bool showOther) {
+    if (!showSelf) {
+      return 0.0f;
+    }
+    if (!showOther) {
+      return contentWidth;
+    }
+    return std::max(0.0f, (contentWidth - Style::spaceMd) * 0.5f);
+  }
+
   float minPanelWidth(LayoutMode layout) {
     return layout == LayoutMode::Regular ? kRegularMinPanelWidth : kCompactMinPanelWidth;
   }
@@ -162,11 +186,12 @@ namespace lockscreen_login_box {
   }
 
   float minPanelHeight(LayoutMode layout, bool showSessionButtons) {
+    const float pad = Style::spaceSm * 2.0f;
     if (layout != LayoutMode::Regular) {
-      return kCompactMinPanelHeight;
+      // Always reserve the status strip: idle hint/caps and auth messages share it.
+      return pad + regularStatusContentHeight() + Style::spaceSm + Style::controlHeight;
     }
     // paddingV + info + status (hint/caps) + password [+ session] + gaps
-    const float pad = Style::spaceSm * 2.0f;
     const int gapCount = showSessionButtons ? 3 : 2;
     float height = pad
         + regularInfoContentHeight()
@@ -190,7 +215,7 @@ namespace lockscreen_login_box {
 
   float defaultPanelHeight(LayoutMode layout, bool showSessionButtons) {
     if (layout != LayoutMode::Regular) {
-      return 70.0f;
+      return minPanelHeight(layout, showSessionButtons);
     }
     return minPanelHeight(layout, showSessionButtons) + Style::spaceMd;
   }
@@ -289,6 +314,8 @@ namespace lockscreen_login_box {
     style.showCapsLock = readBool(settings, kShowCapsLockKey, style.showCapsLock);
     style.showKeyboardLayout = readBool(settings, kShowKeyboardLayoutKey, style.showKeyboardLayout);
     style.showSessionButtons = readBool(settings, kShowSessionButtonsKey, style.showSessionButtons);
+    style.showMedia = readBool(settings, kShowMediaKey, style.showMedia);
+    style.showWeather = readBool(settings, kShowWeatherKey, style.showWeather);
     return style;
   }
 
@@ -298,6 +325,8 @@ namespace lockscreen_login_box {
     if (scope == desktop_settings::DesktopWidgetSettingsScope::Widget) {
       settings.insert_or_assign(std::string(kLayoutKey), std::string(kLayoutRegular));
       settings.insert_or_assign(std::string(kShowSessionButtonsKey), true);
+      settings.insert_or_assign(std::string(kShowMediaKey), true);
+      settings.insert_or_assign(std::string(kShowWeatherKey), true);
       settings.insert_or_assign(std::string(kShowLoginButtonKey), true);
       settings.insert_or_assign(std::string(kShowPasswordHintKey), true);
       settings.insert_or_assign(std::string(kShowCapsLockKey), true);
@@ -318,6 +347,23 @@ namespace lockscreen_login_box {
     applyDefaultSettings(settings, desktop_settings::DesktopWidgetSettingsScope::Background);
   }
 
+  bool applyMediaWeatherToggle(
+      std::unordered_map<std::string, WidgetSettingValue>& settings, std::string_view key, bool enabled
+  ) {
+    if (key != kShowMediaKey && key != kShowWeatherKey) {
+      return false;
+    }
+    if (!enabled) {
+      const std::string_view otherKey = key == kShowMediaKey ? kShowWeatherKey : kShowMediaKey;
+      if (!readBool(settings, otherKey, true)) {
+        settings.insert_or_assign(std::string(key), true);
+        return false;
+      }
+    }
+    settings.insert_or_assign(std::string(key), enabled);
+    return true;
+  }
+
   void normalizeSettings(std::unordered_map<std::string, WidgetSettingValue>& settings) {
     if (!settings.contains(std::string(kLayoutKey))) {
       settings.insert_or_assign(std::string(kLayoutKey), std::string(kLayoutRegular));
@@ -330,8 +376,16 @@ namespace lockscreen_login_box {
     if (!settings.contains(std::string(kShowSessionButtonsKey))) {
       settings.insert_or_assign(std::string(kShowSessionButtonsKey), true);
     }
-    settings.erase("show_media");
-    settings.erase("show_weather");
+    if (!settings.contains(std::string(kShowMediaKey))) {
+      settings.insert_or_assign(std::string(kShowMediaKey), true);
+    }
+    if (!settings.contains(std::string(kShowWeatherKey))) {
+      settings.insert_or_assign(std::string(kShowWeatherKey), true);
+    }
+    // Keep at least one info extra so Regular does not collapse to an empty strip.
+    if (!readBool(settings, kShowMediaKey, true) && !readBool(settings, kShowWeatherKey, true)) {
+      settings.insert_or_assign(std::string(kShowMediaKey), true);
+    }
     if (!settings.contains(std::string(kShowLoginButtonKey))) {
       settings.insert_or_assign(std::string(kShowLoginButtonKey), true);
     }
