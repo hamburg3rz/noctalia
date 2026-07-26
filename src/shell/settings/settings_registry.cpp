@@ -845,15 +845,17 @@ namespace settings {
         ToggleSetting{cfg.theme.templates.enableCommunityTemplates}, "theme templates community"
     ));
     {
+      const std::size_t enabledCount = cfg.theme.templates.communityIds.size();
       auto e = makeEntry(
           SettingsSection::Templates, "community", tr("settings.schema.templates.community-ids.label"),
-          tr("settings.schema.templates.community-ids.description"), {"theme", "templates", "community_ids"},
-          TemplateGridSetting{
-              .options = env.communityTemplates,
-              .selectedValues = cfg.theme.templates.communityIds,
-              .emptyText = tr("settings.schema.templates.community-ids.empty"),
+          enabledCount == 0 ? tr("settings.schema.templates.community-ids.description")
+                            : tr("settings.templates.store.enabled-count", "count", std::to_string(enabledCount)),
+          {},
+          ButtonSetting{
+              .label = tr("settings.templates.store.browse"),
+              .glyph = "apps",
           },
-          "theme templates community apps discord fuzzel vscode walker"
+          "theme templates community apps discord fuzzel vscode walker store browse"
       );
       e.visibleWhen = communityTemplatesOn;
       entries.push_back(std::move(e));
@@ -2852,6 +2854,19 @@ namespace settings {
         tr("settings.schema.notifications.monitors.description"), {"notification", "monitors"},
         ListSetting{.items = cfg.notification.monitors, .suggestedOptions = env.availableOutputs},
         "monitor output display screen"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Notifications, "history", tr("settings.schema.notifications.history-retention-hours.label"),
+        tr("settings.schema.notifications.history-retention-hours.description"),
+        {"notification", "history_retention_hours"},
+        StepperSetting{
+            .value = cfg.notification.historyRetentionHours,
+            .minValue = 0,
+            .maxValue = 8760,
+            .step = 1,
+            .valueSuffix = "h",
+        },
+        "history retention hours clear"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Notifications, "filtering", tr("settings.schema.notifications.filters.label"),
