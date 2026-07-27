@@ -3,6 +3,7 @@
 #include "config/config_types.h"
 #include "config/schema/config_schema.h"
 #include "config/schema/ranges.h"
+#include "core/files/directory_scanner.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "i18n/i18n.h"
@@ -942,7 +943,7 @@ namespace settings {
               .value = cfg.dock.launcherCustomImage,
               .placeholder = tr("settings.schema.dock.launcher-custom-image.placeholder"),
               .browseMode = TextSettingBrowseMode::OpenFile,
-              .browseFileExtensions = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".gif"},
+              .browseFileExtensions = DirectoryScanner::imageExtensionFilter(true),
               .browseFallbackDirectory = "/usr/share/icons",
           },
           "launcher apps image picture logo"
@@ -1403,6 +1404,11 @@ namespace settings {
         },
         "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard"
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "general", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
+        tr("settings.schema.panels.home-shortcuts-show-labels.description"), {"control_center", "show_shortcut_labels"},
+        ToggleSetting{cfg.controlCenter.showShortcutLabels}, "shortcuts labels text hide show titles"
+    ));
     {
       MultiSelectSetting tabs;
       const auto catalog = ControlCenterPanel::hideableTabCatalog();
@@ -1593,7 +1599,7 @@ namespace settings {
               .value = cfg.lockscreen.wallpaper,
               .placeholder = tr("settings.schema.lockscreen.wallpaper.placeholder"),
               .browseMode = TextSettingBrowseMode::OpenFile,
-              .browseFileExtensions = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".gif"},
+              .browseFileExtensions = DirectoryScanner::imageExtensionFilter(true),
               .browseFallbackDirectory = wallpaper::resolveGlobalWallpaperDirectory(
                   cfg.wallpaper, wallpaper::effectiveThemeMode(cfg.theme.mode, cfg.theme.mode == ThemeMode::Light)
               ),
@@ -1680,7 +1686,7 @@ namespace settings {
             .value = env.shellAvatarPath,
             .placeholder = tr("settings.schema.shell.avatar-path.placeholder"),
             .browseMode = TextSettingBrowseMode::OpenFile,
-            .browseFileExtensions = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".gif"}
+            .browseFileExtensions = DirectoryScanner::imageExtensionFilter(true)
         },
         "image picture"
     ));

@@ -3,6 +3,7 @@
 #include "config/config_service.h"
 #include "core/build_info.h"
 #include "core/deferred_call.h"
+#include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
 #include "cursor-shape-v1-client-protocol.h"
@@ -248,7 +249,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     options.mode = FileDialogMode::Open;
     options.defaultViewMode = FileDialogViewMode::Grid;
     options.title = i18n::tr("control-center.home.select-avatar");
-    options.extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"};
+    options.extensions = DirectoryScanner::imageExtensionFilter(false);
     options.startDirectory = avatarStartDirectory(m_accounts, m_config);
 
     (void)FileDialog::open(std::move(options), [this](std::optional<std::filesystem::path> pickedPath) {
@@ -270,7 +271,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     });
   };
 
-  auto avatarArea = std::make_unique<InputArea>();
+  auto avatarArea = ui::inputArea({});
   avatarArea->setSize(avatarSize, avatarSize);
   avatarArea->setHitShape(InputArea::HitShape::Circle);
   avatarArea->setFocusable(true);
@@ -520,24 +521,52 @@ std::unique_ptr<Flex> HomeTab::create() {
   grid->setMinCellHeight(0.0f);
   grid->setFlexGrow(kHomeShortcutsFlexGrow);
   m_shortcutsGrid = grid.get();
+
+  // Keep Shortcut instances across open/close so plugin file watches and runtimes
+  // are not recreated on every Control Center open. Match by id/type from config.
+  std::vector<std::unique_ptr<Shortcut>> previous;
+  previous.reserve(m_shortcutPads.size());
+  for (auto& pad : m_shortcutPads) {
+    previous.push_back(std::move(pad.shortcut));
+  }
   m_shortcutPads.clear();
+
+  auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
+    for (auto it = previous.begin(); it != previous.end(); ++it) {
+      if (*it != nullptr && (*it)->id() == type) {
+        auto found = std::move(*it);
+        previous.erase(it);
+        return found;
+      }
+    }
+    return nullptr;
+  };
 
   for (std::size_t i = 0; i < count; ++i) {
     const auto& sc = shortcuts[i];
-    auto shortcut = ShortcutRegistry::create(sc.type, m_services);
+    auto shortcut = takeReusable(sc.type);
+    const bool reused = shortcut != nullptr;
+    if (!reused) {
+      shortcut = ShortcutRegistry::create(sc.type, m_services);
+    }
     if (shortcut == nullptr) {
       continue;
     }
+    if (reused) {
+      shortcut->onPanelOpen();
+    }
 
+    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
     const std::string label = shortcut->displayLabel();
     const bool enabled = shortcut->enabled();
     const bool isActive = shortcut->isToggle() && shortcut->active();
 
     const std::size_t padIdx = m_shortcutPads.size();
     auto btn = ui::button({
-        .text = label,
+        .text = showLabels ? std::optional<std::string>{label} : std::nullopt,
         .glyph = shortcut->displayIcon(),
         .glyphSize = Style::fontSizeTitle * 1.35f * scale,
+        .contentAlign = showLabels ? ButtonContentAlign::Start : ButtonContentAlign::Center,
         .minHeight = 0.0f,
         .padding = Style::spaceSm * scale,
         .gap = Style::spaceXs * scale,
@@ -555,16 +584,21 @@ std::unique_ptr<Flex> HomeTab::create() {
               }
             },
         .configure =
-            [enabled, isActive, fillOpacity = panelCardOpacity(), scale](Button& button) {
-              // Match media card column: Stretch so label width follows the cell; Center uses intrinsic text width and
-              // fights setMaxWidth.
-              button.setAlign(FlexAlign::Stretch);
-              // Label font only: Button::setFontSize also resizes the glyph. Mini + uiScale keeps tiles closer to
-              // other CC rows that use raw fontSizeCaption, while still scaling with shell.uiScale for consistency.
-              button.label()->setFontSize(Style::fontSizeMini * scale);
-              button.label()->setMaxLines(1);
-              button.label()->setTextAlign(TextAlign::Center);
+            [enabled, isActive, showLabels, fillOpacity = panelCardOpacity(), scale](Button& button) {
               button.setDirection(FlexDirection::Vertical);
+              button.setJustify(FlexJustify::Center);
+              if (showLabels) {
+                // Stretch so the label width follows the cell; Center uses intrinsic text
+                // width and fights setMaxWidth.
+                button.setAlign(FlexAlign::Stretch);
+                if (button.label() != nullptr) {
+                  button.label()->setFontSize(Style::fontSizeMini * scale);
+                  button.label()->setMaxLines(1);
+                  button.label()->setTextAlign(TextAlign::Center);
+                }
+              } else {
+                button.setAlign(FlexAlign::Center);
+              }
               applyShortcutButtonStyle(button, enabled, isActive, fillOpacity);
             },
     });
@@ -783,6 +817,7 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   // Lock the shortcuts grid height to its square-cell natural size so it does not vary
   // when the media or clock cards change. The leftColumn stretches to match this height.
   if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
+    const float scale = contentScale();
     const float gridW = m_shortcutsGrid->width();
     const float innerGridW = std::max(1.0f, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
     const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
@@ -793,6 +828,19 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     // Cells aim for square but trimmed slightly so the grid stays compact and the bottom row
     // doesn't tower over the user card area. The width was capped earlier so this stays bounded.
     const float cellSide = cellWidth * kHomeShortcutSquareTrim;
+    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
+    for (auto& pad : m_shortcutPads) {
+      if (pad.glyph == nullptr) {
+        continue;
+      }
+      if (showLabels) {
+        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35f * scale);
+      } else {
+        const float dynamicGlyphSize = std::clamp(cellSide * 0.28f, 22.0f * scale, 44.0f * scale);
+        pad.glyph->setGlyphSize(dynamicGlyphSize);
+      }
+    }
+
     const float measuredRowH = m_bottomRow != nullptr ? m_bottomRow->height() : m_shortcutsGrid->height();
     const float formulaH = static_cast<float>(rows) * cellSide
         + static_cast<float>(rows > 0 ? rows - 1 : 0) * m_shortcutsGrid->rowGap()
@@ -842,7 +890,7 @@ InputArea* HomeTab::addCardOverlay(Flex& card, std::function<void()> onActivate)
 }
 
 InputArea* HomeTab::addCardOverlay(Flex& card, std::function<void()> onActivate, CardOverlayOptions options) {
-  auto area = std::make_unique<InputArea>();
+  auto area = ui::inputArea({});
   area->setParticipatesInLayout(false);
   area->setZIndex(3);
   area->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER);
@@ -1233,7 +1281,15 @@ void HomeTab::onClose() {
   m_nextRealtimeUpdateAt = {};
   m_lastRealtimeMprisPollAt = {};
   m_shortcutsGrid = nullptr;
-  m_shortcutPads.clear();
+  // Keep Shortcut instances alive; drop only the UI pointers destroyed with the scene.
+  for (auto& pad : m_shortcutPads) {
+    if (pad.shortcut != nullptr) {
+      pad.shortcut->onPanelClose();
+    }
+    pad.button = nullptr;
+    pad.glyph = nullptr;
+    pad.label = nullptr;
+  }
 }
 
 void HomeTab::onPanelCardOpacityChanged(float opacity) {
@@ -1277,7 +1333,10 @@ void HomeTab::syncScaledFonts() {
       pad.label->setFontSize(Style::fontSizeMini * s);
     }
     if (pad.glyph != nullptr) {
-      pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35f * s);
+      // Icon-only glyphs are sized from cell side in doLayout.
+      if (m_config == nullptr || m_config->config().controlCenter.showShortcutLabels) {
+        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35f * s);
+      }
     }
   }
 }

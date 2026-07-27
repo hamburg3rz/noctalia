@@ -303,9 +303,9 @@ void Application::syncPolkitAgent() {
       return;
     }
     m_polkitIdleCloseTimer.stop();
-    // Open once the session asks for a response so preferredHeight includes the
-    // password field. BeginAuthentication alone still has responseRequired=false.
-    if (!m_polkitAgent->isResponseRequired() && !m_panelManager.isOpenPanel("polkit")) {
+    // BeginAuthentication alone has no prompt yet; show-info and request both do.
+    const bool hasContent = m_polkitAgent->isResponseRequired() || !m_polkitAgent->supplementaryMessage().empty();
+    if (!hasContent && !m_panelManager.isOpenPanel("polkit")) {
       return;
     }
     if (!m_panelManager.isOpenPanel("polkit")) {
@@ -515,6 +515,12 @@ void Application::initStyleThemeAndWayland() {
 
   // Let a plugin toggle one of its own panels.
   m_scriptApi.setTogglePanelHook([this](const std::string& panelId) { m_panelManager.togglePanel(panelId); });
+
+  m_scriptApi.setOpenPluginSettingsHook([this](const std::string& pluginId) {
+    if (!m_panelManager.openPluginSettings(pluginId)) {
+      kLog.warn("plugin openSettings ignored: \"{}\" has no settings", pluginId);
+    }
+  });
 
   m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{},
                                       syncScriptApiWallpaperDirectory](
