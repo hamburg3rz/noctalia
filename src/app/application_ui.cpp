@@ -137,6 +137,7 @@ void Application::initUiRenderSurfacesAndSettings() {
   );
   m_settingsWindow.setPluginManager(&m_pluginManager);
   m_settingsWindow.setIpcService(&m_ipcService);
+  m_settingsWindow.setAsyncTextureCache(&m_asyncTextureCache);
   m_settingsWindow.setOpenDesktopWidgetEditor([this]() {
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.exitEdit();
@@ -506,7 +507,10 @@ void Application::initPanelManagerAndPanels() {
     m_panelManager.openPanel("wallpaper", PanelOpenRequest{.output = output});
   });
   m_settingsWindow.setCalendarService(&m_calendarService);
-  m_calendarService.setCredentialChangeCallback([this]() { m_settingsWindow.onExternalOptionsChanged(); });
+  m_calendarService.setCredentialChangeCallback([this]() {
+    m_settingsWindow.onExternalOptionsChanged();
+    retrySecretServiceConsumers();
+  });
   m_settingsWindow.setClipboardService(&m_clipboardService);
   m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsWindow.onExternalOptionsChanged(); });
   m_settingsWindow.setResetEncryptedStorage([this]() {
