@@ -828,6 +828,8 @@ namespace noctalia::config::schema {
         keybindActionField(&KeybindsConfig::tabNext, "tab_next", KeybindAction::TabNext),
         keybindActionField(&KeybindsConfig::tabPrevious, "tab_previous", KeybindAction::TabPrevious),
         keybindActionField(&KeybindsConfig::deleteEntry, "delete", KeybindAction::Delete),
+        keybindActionField(&KeybindsConfig::copy, "copy", KeybindAction::Copy),
+        keybindActionField(&KeybindsConfig::save, "save", KeybindAction::Save),
     };
     return s;
   }
@@ -1336,6 +1338,7 @@ namespace noctalia::config::schema {
           field(&ShellConfig::ScreenshotConfig::copyToClipboard, "copy_to_clipboard"),
           field(&ShellConfig::ScreenshotConfig::freezeScreen, "freeze_screen"),
           field(&ShellConfig::ScreenshotConfig::confirmRegion, "confirm_region"),
+          field(&ShellConfig::ScreenshotConfig::rememberLastRegion, "remember_last_region"),
           field(&ShellConfig::ScreenshotConfig::showCursor, "show_cursor"),
           field(&ShellConfig::ScreenshotConfig::pipeToCommand, "pipe_to_command"),
           field(&ShellConfig::ScreenshotConfig::pipeCommand, "pipe_command"),

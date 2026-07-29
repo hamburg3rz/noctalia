@@ -535,6 +535,11 @@ void Application::initStyleThemeAndWayland() {
     );
   };
 
+  auto syncScriptApiShellTimeFormats = [this]() {
+    m_scriptApi.setTimeFormat(m_configService.config().shell.timeFormat);
+    m_scriptApi.setDateFormat(m_configService.config().shell.dateFormat);
+  };
+
   // Publish the connected outputs to plugin scripts (noctalia.outputs()), refreshed on every
   // output change so the worker-thread binding reads a race-free copy.
   m_syncScriptApiOutputs = [this]() {
@@ -604,8 +609,10 @@ void Application::initStyleThemeAndWayland() {
   });
   m_themeService.apply();
   syncScriptApiWallpaperDirectory();
+  syncScriptApiShellTimeFormats();
   m_configService.addReloadCallback([this]() { m_themeService.onConfigReload(); }, "theme");
   m_configService.addReloadCallback(syncScriptApiWallpaperDirectory, "wallpaper");
+  m_configService.addReloadCallback(syncScriptApiShellTimeFormats, "shell-time-formats");
   {
     static ShellAppIconColorizationSettings lastAppIconColorization =
         shellAppIconColorizationSettings(m_configService.config().shell);
@@ -656,6 +663,8 @@ void Application::initStyleThemeAndWayland() {
   KeybindMatcher::setMatcher(KeybindAction::Down, bindKeybind(KeybindAction::Down));
   KeybindMatcher::setMatcher(KeybindAction::TabNext, bindKeybind(KeybindAction::TabNext));
   KeybindMatcher::setMatcher(KeybindAction::TabPrevious, bindKeybind(KeybindAction::TabPrevious));
+  KeybindMatcher::setMatcher(KeybindAction::Copy, bindKeybind(KeybindAction::Copy));
+  KeybindMatcher::setMatcher(KeybindAction::Save, bindKeybind(KeybindAction::Save));
   KeybindMatcher::setMatcher(KeybindAction::Delete, bindKeybind(KeybindAction::Delete));
 
   Input::setValidateKeyMatcher([this](std::uint32_t sym, std::uint32_t modifiers) {
@@ -910,6 +919,16 @@ void Application::initAuxServicesAndHooks() {
   }
 }
 
+void Application::releaseSleepDelayInhibitIfPending() {
+  if (!m_releaseSleepDelayWhenLocked) {
+    return;
+  }
+  m_releaseSleepDelayWhenLocked = false;
+  if (m_logindService != nullptr) {
+    m_logindService->releaseSleepDelayInhibit();
+  }
+}
+
 void Application::initSystemBusServices() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
@@ -930,7 +949,45 @@ void Application::initSystemBusServices() {
           // fade-complete cleanup races with process freeze.
           m_idleGraceOverlay.hide();
           if (sleeping) {
+            // Delay inhibit (acquired while lockscreen is enabled) holds sleep until we lock.
+            // Do not use runAfterSessionLocked here — that slot belongs to lock-and-suspend.
+            if (!m_configService.isLockScreenEnabled()) {
+              m_releaseSleepDelayWhenLocked = false;
+              if (m_logindService != nullptr) {
+                m_logindService->releaseSleepDelayInhibit();
+              }
+              return;
+            }
+            if (m_lockScreen.isSessionLocked()) {
+              m_releaseSleepDelayWhenLocked = false;
+              if (m_logindService != nullptr) {
+                m_logindService->releaseSleepDelayInhibit();
+              }
+              return;
+            }
+            m_releaseSleepDelayWhenLocked = true;
+            if (m_lockScreen.isActive()) {
+              return;
+            }
+            if (!m_lockScreen.lock()) {
+              m_releaseSleepDelayWhenLocked = false;
+              if (m_logindService != nullptr) {
+                m_logindService->releaseSleepDelayInhibit();
+              }
+              return;
+            }
+            // Deferred lock (no outputs yet) never reaches SessionLocked; do not block sleep.
+            if (!m_lockScreen.isActive()) {
+              m_releaseSleepDelayWhenLocked = false;
+              if (m_logindService != nullptr) {
+                m_logindService->releaseSleepDelayInhibit();
+              }
+            }
             return;
+          }
+          m_releaseSleepDelayWhenLocked = false;
+          if (m_configService.isLockScreenEnabled() && m_logindService != nullptr) {
+            (void)m_logindService->acquireSleepDelayInhibit();
           }
           kLog.info("system resumed; rechecking night light schedule");
           m_gammaService.reevaluateSchedule();
