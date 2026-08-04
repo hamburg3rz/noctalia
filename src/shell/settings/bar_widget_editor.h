@@ -21,11 +21,10 @@ namespace settings {
   struct BarWidgetEditorContext {
     const Config& config;
     ConfigService* configService = nullptr;
-    float scale = 1.0f;
+    float scale = 1.0F;
     bool showAdvanced = false;
     bool showOverriddenOnly = false;
     std::vector<SelectOption> batteryDeviceOptions;
-    std::vector<std::string> keyboardLayoutNames;
     std::string& editingWidgetName;
     std::string& editingCapsuleGroupId;
     std::vector<std::string>& selectedLaneWidgets;

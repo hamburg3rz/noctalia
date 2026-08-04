@@ -275,13 +275,14 @@ float shadow_shape_distance(vec2 point, vec2 size, vec4 radii, vec4 corner_shape
 // Pixel-grid-snap window for axis-aligned edges: half-coverage falls exactly on
 // the boundary so an integer-aligned edge produces 100% on the inside pixel and
 // 0% on the outside pixel, with no semi-transparent leakage.
-float coverage_for(vec2 distance_with_corner, float aa_curve) {
+// Curved corners share the same sub-pixel window so they stay as crisp as the
+// straight edges; using the shadow softness here would double the corner AA
+// width and render rounded corners visibly blurry.
+float coverage_for(float distance) {
     if (u_no_aa == 1) {
-        return 1.0 - step(0.0, distance_with_corner.x);
+        return 1.0 - step(0.0, distance);
     }
-    float lo = mix(-0.5, -aa_curve, distance_with_corner.y);
-    float hi = mix( 0.5,  aa_curve, distance_with_corner.y);
-    return 1.0 - smoothstep(lo, hi, distance_with_corner.x);
+    return 1.0 - smoothstep(-0.5, 0.5, distance);
 }
 
 float gradient_segment_t(float position, float start, float end) {
@@ -315,7 +316,7 @@ void main() {
 
     vec2 outer = shape_distance_with_corner(local_point, u_rect_size, u_radii, u_corner_shapes, u_logical_inset);
     float outer_distance = outer.x;
-    float outer_coverage = coverage_for(outer, aa);
+    float outer_coverage = coverage_for(outer_distance);
     if (u_invert_fill == 1) outer_coverage = 1.0 - outer_coverage;
 
     if (u_outer_shadow == 1) {
@@ -368,7 +369,7 @@ void main() {
         vec4 inner_inset = max(u_logical_inset - vec4(u_border_width), vec4(0.0));
         inner = shape_distance_with_corner(inner_point, inner_size, inner_radii, u_corner_shapes, inner_inset);
     }
-    float inner_coverage = coverage_for(inner, aa);
+    float inner_coverage = coverage_for(inner.x);
 
     if (fill_base.a <= 0.0) {
         float ring_coverage = outer_coverage * (1.0 - inner_coverage);
@@ -514,17 +515,17 @@ void RectProgram::draw(
     float surfaceWidth, float surfaceHeight, float width, float height, const RoundedRectStyle& style,
     const Mat3& transform
 ) const {
-  if (!m_program.isValid() || width <= 0.0f || height <= 0.0f) {
+  if (!m_program.isValid() || width <= 0.0F || height <= 0.0F) {
     return;
   }
 
   const std::array<GLfloat, 12> vertices = {
-      0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+      0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.0F, 1.0F, 0.0F, 1.0F, 1.0F,
   };
 
-  const float padding = std::max(style.borderWidth + style.softness + 2.0f, 2.0f);
-  const float quadWidth = width + padding * 2.0f;
-  const float quadHeight = height + padding * 2.0f;
+  const float padding = std::max(style.borderWidth + style.softness + 2.0F, 2.0F);
+  const float quadWidth = width + padding * 2.0F;
+  const float quadHeight = height + padding * 2.0F;
   const float rectOrigin = padding;
   const Mat3 quadTransform = transform * Mat3::translation(-padding, -padding);
 
@@ -543,8 +544,8 @@ void RectProgram::draw(
   }
   glUniform1i(m_fillModeLocation, fillMode);
   glUniform2f(
-      m_gradientDirectionLocation, style.gradientDirection == GradientDirection::Horizontal ? 1.0f : 0.0f,
-      style.gradientDirection == GradientDirection::Vertical ? 1.0f : 0.0f
+      m_gradientDirectionLocation, style.gradientDirection == GradientDirection::Horizontal ? 1.0F : 0.0F,
+      style.gradientDirection == GradientDirection::Vertical ? 1.0F : 0.0F
   );
   const auto& stop0 = style.gradientStops[0];
   const auto& stop1 = style.gradientStops[1];
@@ -555,7 +556,7 @@ void RectProgram::draw(
   glUniform4f(m_gradientColor1Location, stop1.color.r, stop1.color.g, stop1.color.b, stop1.color.a);
   glUniform4f(m_gradientColor2Location, stop2.color.r, stop2.color.g, stop2.color.b, stop2.color.a);
   glUniform4f(m_gradientColor3Location, stop3.color.r, stop3.color.g, stop3.color.b, stop3.color.a);
-  const auto cornerShapeValue = [](CornerShape shape) { return shape == CornerShape::Concave ? 1.0f : 0.0f; };
+  const auto cornerShapeValue = [](CornerShape shape) { return shape == CornerShape::Concave ? 1.0F : 0.0F; };
   glUniform4f(
       m_cornerShapesLocation, cornerShapeValue(style.corners.tl), cornerShapeValue(style.corners.tr),
       cornerShapeValue(style.corners.br), cornerShapeValue(style.corners.bl)
