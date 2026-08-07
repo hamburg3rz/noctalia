@@ -587,6 +587,7 @@ void Application::initStyleThemeAndWayland() {
   });
 
   m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{},
+                                      lastGeneratedPalette = std::optional<noctalia::theme::GeneratedPalette>{},
                                       syncScriptApiWallpaperDirectory](
                                          const noctalia::theme::GeneratedPalette& generated, std::string_view mode
                                      ) mutable {
@@ -596,7 +597,11 @@ void Application::initStyleThemeAndWayland() {
     syncScriptApiWallpaperDirectory();
     const std::optional<std::string> previousMode = lastResolvedThemeMode;
     lastResolvedThemeMode = resolvedMode;
-    m_templateApplyService.setAfterApplyCallback([this]() { m_hookManager.fire(HookKind::ColorsChanged); });
+    const bool colorsChanged = !lastGeneratedPalette.has_value() || *lastGeneratedPalette != generated;
+    lastGeneratedPalette = generated;
+    if (colorsChanged) {
+      m_templateApplyService.setAfterApplyCallback([this]() { m_hookManager.fire(HookKind::ColorsChanged); });
+    }
     m_templateApplyService.apply(generated, mode);
     if (previousMode.has_value() && *previousMode != resolvedMode) {
       m_hookManager.fire(
@@ -949,7 +954,7 @@ void Application::initSystemBusServices() {
           // fade-complete cleanup races with process freeze.
           m_idleGraceOverlay.hide();
           if (sleeping) {
-            // Delay inhibit (acquired while lockscreen is enabled) holds sleep until we lock.
+            // Delay inhibit (when lock_before_suspend is on) holds sleep until we lock.
             // Do not use runAfterSessionLocked here — that slot belongs to lock-and-suspend.
             if (m_skipLockOnNextSleep) {
               // Noctalia-initiated suspend: skip lock-before-sleep (plain Suspend or already locked).
@@ -960,7 +965,7 @@ void Application::initSystemBusServices() {
               }
               return;
             }
-            if (!m_configService.isLockScreenEnabled()) {
+            if (!m_configService.shouldLockBeforeSuspend()) {
               m_releaseSleepDelayWhenLocked = false;
               if (m_logindService != nullptr) {
                 m_logindService->releaseSleepDelayInhibit();
@@ -996,7 +1001,7 @@ void Application::initSystemBusServices() {
           }
           m_skipLockOnNextSleep = false;
           m_releaseSleepDelayWhenLocked = false;
-          if (m_configService.isLockScreenEnabled() && m_logindService != nullptr) {
+          if (m_configService.shouldLockBeforeSuspend() && m_logindService != nullptr) {
             (void)m_logindService->acquireSleepDelayInhibit();
           }
           kLog.info("system resumed; rechecking night light and auto theme schedules");

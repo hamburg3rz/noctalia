@@ -89,6 +89,7 @@ namespace noctalia::config::schema {
   const Schema<LockscreenConfig>& lockscreenSchema() {
     static const Schema<LockscreenConfig> s = {
         field(&LockscreenConfig::enabled, "enabled"),
+        field(&LockscreenConfig::lockBeforeSuspend, "lock_before_suspend"),
         field(&LockscreenConfig::fingerprint, "fingerprint"),
         field(&LockscreenConfig::allowEmptyPassword, "allow_empty_password"),
         field(&LockscreenConfig::blurredDesktop, "blurred_desktop"),
@@ -253,6 +254,7 @@ namespace noctalia::config::schema {
         field(&NotificationConfig::monitors, "monitors"),
         field(&NotificationConfig::collapseOnDismiss, "collapse_on_dismiss"),
         field(&NotificationConfig::historyRetentionHours, "history_retention_hours", Range<std::int64_t>{0, 8760}),
+        field(&NotificationConfig::maxVisible, "max_visible", Range<std::int64_t>{0, 20}),
         custom<NotificationConfig>(
             "blacklist",
             [](const toml::table& tbl, NotificationConfig& out, std::string_view, Diagnostics&) {
@@ -1488,6 +1490,7 @@ namespace noctalia::config::schema {
         field(&ShellConfig::polkitAgent, "polkit_agent"),
         enumField(&ShellConfig::passwordMaskStyle, "password_style", kPasswordMaskStyles),
         field(&ShellConfig::settingsShowAdvanced, "settings_show_advanced"),
+        field(&ShellConfig::settingsWindowTranslucent, "settings_window_translucent"),
         field(&ShellConfig::showLocation, "show_location"),
         field(&ShellConfig::appIconColorize, "app_icon_colorize"),
         colorSpecField(&ShellConfig::appIconColor, "app_icon_color", /*alwaysEmit=*/false),

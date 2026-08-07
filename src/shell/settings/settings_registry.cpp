@@ -1572,6 +1572,15 @@ namespace settings {
     }
     {
       auto e = makeEntry(
+          SettingsSection::Security, "lock-screen", tr("settings.schema.lockscreen.lock-before-suspend.label"),
+          tr("settings.schema.lockscreen.lock-before-suspend.description"), {"lockscreen", "lock_before_suspend"},
+          ToggleSetting{cfg.lockscreen.lockBeforeSuspend}, "lock screen before suspend sleep lid close prepareforsleep"
+      );
+      e.visibleWhen = lockscreenOn;
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
           SettingsSection::Security, "lock-screen", tr("settings.schema.lockscreen.fingerprint.label"),
           tr("settings.schema.lockscreen.fingerprint.description"), {"lockscreen", "fingerprint"},
           ToggleSetting{cfg.lockscreen.fingerprint}, "lock screen fingerprint fprintd biometric"
@@ -1698,6 +1707,11 @@ namespace settings {
             .browseFileExtensions = DirectoryScanner::imageExtensionFilter(true)
         },
         "image picture"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Shell, "general", tr("settings.schema.shell.settings-window-translucent.label"),
+        tr("settings.schema.shell.settings-window-translucent.description"), {"shell", "settings_window_translucent"},
+        ToggleSetting{cfg.shell.settingsWindowTranslucent}, "settings window background transparency translucent"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Shell, "general", tr("settings.schema.shell.time-format.label"),
@@ -2889,6 +2903,14 @@ namespace settings {
             .value = cfg.notification.offsetY, .minValue = 0, .maxValue = 200, .step = 1, .valueSuffix = "px"
         },
         "offset margin vertical"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Notifications, "toasts", tr("settings.schema.notifications.max-visible.label"),
+        tr("settings.schema.notifications.max-visible.description"), {"notification", "max_visible"},
+        StepperSetting{
+            .value = cfg.notification.maxVisible, .minValue = 0, .maxValue = 20, .step = 1, .valueSuffix = ""
+        },
+        "maximum on-screen toasts count limit"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Notifications, "toasts", tr("settings.schema.notifications.toast-opacity.label"),

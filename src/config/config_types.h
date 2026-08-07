@@ -525,6 +525,9 @@ struct BackdropConfig {
 
 struct LockscreenConfig {
   bool enabled = true;
+  // Lock on PrepareForSleep (lid close / systemctl suspend) via logind sleep-delay inhibit.
+  // Distinct from idle/session lock_and_suspend actions.
+  bool lockBeforeSuspend = true;
   bool fingerprint = true;
   bool allowEmptyPassword = false;
   bool blurredDesktop = false;
@@ -538,6 +541,10 @@ struct LockscreenConfig {
 
 [[nodiscard]] inline bool isLockScreenEnabled(const LockscreenConfig& lockscreen) noexcept {
   return lockscreen.enabled;
+}
+
+[[nodiscard]] inline bool shouldLockBeforeSuspend(const LockscreenConfig& lockscreen) noexcept {
+  return lockscreen.enabled && lockscreen.lockBeforeSuspend;
 }
 
 template <typename T> struct EnumOption {
@@ -735,6 +742,7 @@ struct NotificationConfig {
   std::vector<std::string> monitors;
   bool collapseOnDismiss = true;
   int historyRetentionHours = 0;
+  int maxVisible = 0; // 0 = unlimited (space-based only)
 
   std::vector<NotificationFilterConfig> filters;
 
@@ -1061,6 +1069,7 @@ struct ShellConfig {
   AnimationConfig animation;
   std::string avatarPath;
   bool settingsShowAdvanced = true;
+  bool settingsWindowTranslucent = false;
   bool showLocation = true;
   bool appIconColorize = false;
   std::optional<ColorSpec> appIconColor;

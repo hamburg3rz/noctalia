@@ -549,6 +549,7 @@
         "stat-swap-pct": "Swap %",
         "stat2": "Estadística 2",
         "title": "Título",
+        "track-color": "Color de la pista",
         "variant": "Estilo",
         "variant-default": "Por defecto",
         "variant-destructive": "Destructivo",
@@ -965,6 +966,9 @@
           "title": "Widgets de la barra"
         },
         "group": {
+          "accordion": "Acordeón",
+          "accordion-description": "Mostrar solo el primer widget; al pasar el cursor sobre la cápsula se revela el resto",
+          "accordion-direction": "Dirección de revelado",
           "action": "Grupo",
           "border": "Borde",
           "border-description": "Rol de color del contorno de la cápsula; deja en Predeterminado para no tener contorno",
@@ -2357,7 +2361,8 @@
         },
         "calendar-edit": {
           "button": "Editar",
-          "description": "Actualizar esta cuenta de calendario"
+          "description": "Actualizar esta cuenta de calendario",
+          "description-reconnect": "Se ha perdido la autorizacion de Google. Reconecte esta cuenta."
         },
         "calendar-event-date-format": {
           "description": "El formato de la fecha mostrada en el panel de los eventos para la fecha seleccionada",
@@ -2373,6 +2378,7 @@
         },
         "calendar-storage": {
           "button": "Reintentar",
+          "description-recovery": "La cache de eventos del calendario no se puede autenticar o esta dañada. Reintentar despues de restaurar la key correcta, o reinicie el almacenamiento privado.",
           "description-unavailable": "No hay ningun Almacen de Credenciales disponible. Los eventos del Calendario permaneceran disponibles para esta sesion unicamente."
         },
         "day-temperature": {
@@ -2602,6 +2608,7 @@
         "clipboard-storage": {
           "button": "Reintentar",
           "description-cancelled": "El Almacen de Credenciales se ha cancelado. El historial del portapapeles permanecera disponible en esta sesion unicamente.",
+          "description-recovery": "El historial del portapapeles no se puede autenticar o esta dañado. Reintentar despues de restaurar la key correcta, o reinicie el almacenamiento privado.",
           "description-unavailable": "No hay ningun Almacen de Credenciales disponible. El historial del portapapeles permanecera disponible en esta sesion unicamente."
         },
         "date-format": {
@@ -3095,10 +3102,6 @@
         "custom-image-colorize": {
           "description": "Teñir la imagen personalizada con la configuración de color de icono del widget",
           "label": "Colorear imagen personalizada"
-        },
-        "custom-labels": {
-          "description": "Asignar nombres de distribución de teclado a etiquetas personalizadas",
-          "label": "Etiquetas personalizadas"
         },
         "detached-panel": {
           "description": "Abrir bandeja desplegable como un panel flotante con fondo propio en lugar de fusionarse con la barra",
