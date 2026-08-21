@@ -324,7 +324,8 @@ namespace {
 
   void buildWindowEntries(
       const CompositorPlatform& platform, IconResolver& iconResolver, int iconSize,
-      std::vector<WindowSwitcherEntry>& out, const std::optional<std::string>& focusedId
+      std::vector<WindowSwitcherEntry>& out, const std::optional<std::string>& focusedId,
+      bool promoteFocused
   ) {
     std::unordered_map<std::string, WorkspaceWindowAssignment> assignmentById;
     assignmentById.reserve(32);
@@ -415,7 +416,7 @@ namespace {
       }
     }
 
-    if (focusedKey.has_value()) {
+    if (promoteFocused && focusedKey.has_value()) {
       for (auto it = candidates.begin(); it != candidates.end(); ++it) {
         const std::string key = identityKeyForEntry(it->entry);
         if (key == *focusedKey
@@ -573,6 +574,14 @@ void WindowSwitcher::onOutputChange() {
 }
 
 void WindowSwitcher::onToplevelChange() {
+  if (m_platform != nullptr) {
+    const auto focusedId = m_platform->focusedCompositorWindowId();
+    if (focusedId.has_value() && !focusedId->empty() && focusedId != m_lastFocusedWindowId) {
+      m_previousWindowId = m_lastFocusedWindowId;
+      m_lastFocusedWindowId = focusedId;
+    }
+  }
+
   if (!m_active) {
     return;
   }
@@ -595,6 +604,21 @@ void WindowSwitcher::show(wl_output* output) {
   m_output = output;
   if (wasActive) {
     cycleSelection(1);
+  } else if (m_previousWindowId.has_value()) {
+    const std::string previousKey = canonicalWindowId(*m_previousWindowId);
+    bool found = false;
+    for (std::size_t i = 0; i < m_windows.size(); ++i) {
+      const std::string key = identityKeyForEntry(m_windows[i]);
+      if (key == previousKey
+          || (compositors::isHyprland() && compositors::hyprland::windowIdsEqual(key, previousKey))) {
+        m_selectedIndex = i;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      m_selectedIndex = m_windows.size() > 1 ? 1 : 0;
+    }
   } else {
     m_selectedIndex = m_windows.size() > 1 ? 1 : 0;
   }
@@ -618,6 +642,7 @@ void WindowSwitcher::hide() {
   m_windows.clear();
   m_selectedIndex = 0;
   m_gridColumns = kGridColumns;
+  m_pinnedFrontWindowId.reset();
   destroySurface();
 }
 
@@ -635,9 +660,15 @@ void WindowSwitcher::refreshWindows() {
     }
   }
 
+  if (!m_active) {
+    m_pinnedFrontWindowId = m_platform->focusedCompositorWindowId();
+  }
+
   IconResolver iconResolver;
   const int iconSize = 96;
-  buildWindowEntries(*m_platform, iconResolver, iconSize, m_windows, m_platform->focusedCompositorWindowId());
+  buildWindowEntries(
+      *m_platform, iconResolver, iconSize, m_windows, m_pinnedFrontWindowId, m_pinnedFrontWindowId.has_value()
+  );
 
   if (selectedKey.has_value()) {
     for (std::size_t i = 0; i < m_windows.size(); ++i) {

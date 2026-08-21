@@ -68,4 +68,7 @@ private:
   std::size_t m_gridColumns = 5;
   wl_output* m_output = nullptr;
   bool m_active = false;
+  std::optional<std::string> m_lastFocusedWindowId;
+  std::optional<std::string> m_previousWindowId;
+  std::optional<std::string> m_pinnedFrontWindowId;
 };

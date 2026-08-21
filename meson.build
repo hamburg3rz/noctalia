@@ -940,6 +940,8 @@ _noctalia_sources = files(
   'src/compositors/sway/sway_workspace_backend.cpp',
   'src/compositors/kde/kwin_active_window.cpp',
   'src/compositors/kde/kwin_workspace_backend.cpp',
+  'src/compositors/jay/jay_output_backend.cpp',
+  'src/compositors/jay/jay_workspace_backend.cpp',
   'src/compositors/labwc/labwc_workspace_backend.cpp',
   'src/wayland/layer_surface.cpp',
   'src/wayland/output_probe.cpp',

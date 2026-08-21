@@ -133,6 +133,7 @@ namespace compositors {
     [[nodiscard]] virtual short pollEvents() const noexcept { return POLLIN | POLLHUP | POLLERR; }
     [[nodiscard]] virtual int pollTimeoutMs() const noexcept { return -1; }
     virtual void dispatchPoll(short /*revents*/) {}
+    virtual void notifyToplevelChange() {}
     virtual void apply(std::vector<Workspace>& /*workspaces*/, const std::string& /*outputName*/ = {}) const {}
     [[nodiscard]] virtual std::vector<std::string> workspaceKeys(const std::string& /*outputName*/ = {}) const {
       return {};

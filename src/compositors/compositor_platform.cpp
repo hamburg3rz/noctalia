@@ -8,6 +8,8 @@
 #include "compositors/hyprland/hyprland_runtime.h"
 #include "compositors/hyprland/hyprland_toplevel_mapping.h"
 #include "compositors/hyprland/hyprland_window_id.h"
+#include "compositors/jay/jay_output_backend.h"
+#include "compositors/jay/jay_workspace_backend.h"
 #include "compositors/kde/kwin_active_window.h"
 #include "compositors/mango/mango_keyboard_backend.h"
 #include "compositors/mango/mango_output_backend.h"
@@ -354,6 +356,11 @@ namespace {
           },
           true
       );
+    case compositors::CompositorKind::Jay:
+      return std::make_unique<LambdaOutputPowerBackend>(
+          [](WaylandConnection& wayland, bool on) { return compositors::jay::setOutputPower(wayland, on); },
+          true
+      );
     case compositors::CompositorKind::Dwl:
     case compositors::CompositorKind::Labwc:
     case compositors::CompositorKind::Kde:
@@ -379,6 +386,7 @@ namespace {
     case compositors::CompositorKind::Labwc:
     case compositors::CompositorKind::Kde:
     case compositors::CompositorKind::Mango:
+    case compositors::CompositorKind::Jay:
     case compositors::CompositorKind::Umbriel:
     case compositors::CompositorKind::Unknown:
       break;
@@ -403,6 +411,8 @@ namespace {
     case compositors::CompositorKind::Labwc:
     case compositors::CompositorKind::Unknown:
       break;
+    case compositors::CompositorKind::Jay:
+      return std::make_unique<JayWorkspaceBackend>();
     }
     return nullptr;
   }
@@ -425,6 +435,7 @@ namespace {
     case compositors::CompositorKind::Dwl:
     case compositors::CompositorKind::Labwc:
     case compositors::CompositorKind::Kde:
+    case compositors::CompositorKind::Jay:
     case compositors::CompositorKind::Unknown:
       break;
     }
@@ -602,7 +613,12 @@ CompositorPlatform::CompositorPlatform(WaylandConnection& wayland)
   m_wayland.setHyprlandToplevelMappingManagerCallback([this](hyprland_toplevel_mapping_manager_v1* manager) {
     bindHyprlandToplevelMappingManager(manager);
   });
-  m_wayland.setToplevelChangeCallback([this]() { notifyToplevelsChanged(); });
+  m_wayland.setToplevelChangeCallback([this]() {
+    if (m_workspaceMetadataBackend != nullptr) {
+      m_workspaceMetadataBackend->notifyToplevelChange();
+    }
+    notifyToplevelsChanged();
+  });
   m_wayland.setOutputLifecycleCallbacks(
       [this](wl_output* output) { onOutputAdded(output); }, [this](wl_output* output) { onOutputRemoved(output); }
   );
@@ -1114,6 +1130,25 @@ std::optional<std::string> CompositorPlatform::focusedCompositorWindowId() const
     if (auto id = m_workspaceMetadataBackend->focusedWindowId(); id.has_value() && !id->empty()) {
       return id;
     }
+    if (compositors::isJay()) {
+      std::string activatedTitle;
+      std::string activatedAppId;
+      m_wayland.visitWlrToplevels([&](const WlrToplevelSnapshot& toplevel) {
+        if (toplevel.activated) {
+          activatedTitle = toplevel.title;
+          activatedAppId = toplevel.appId;
+        }
+      });
+      if (!activatedTitle.empty() || !activatedAppId.empty()) {
+        for (const auto& window : m_workspaceMetadataBackend->workspaceWindows()) {
+          const bool appIdMatches = activatedAppId.empty() || window.appId == activatedAppId;
+          const bool titleMatches = activatedTitle.empty() || window.title == activatedTitle;
+          if (appIdMatches && titleMatches) {
+            return window.windowId;
+          }
+        }
+      }
+    }
   }
   return std::nullopt;
 }
@@ -1546,6 +1581,8 @@ bool CompositorPlatform::requestSessionExit() const {
     const auto& command = m_runtimeRegistry->sway().msgCommand();
     return !command.empty() && process::runAsync(std::vector<std::string>{command, "exit"});
   }
+  case compositors::CompositorKind::Jay:
+    return process::runAsync({"jay", "quit"});
   case compositors::CompositorKind::Niri:
     return m_runtimeRegistry->niri().requestAction(
         nlohmann::json{{"Quit", nlohmann::json{{"skip_confirmation", true}}}}, true
